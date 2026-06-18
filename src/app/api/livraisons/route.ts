@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireOperateur, requireAny } from '@/lib/api-guard'
 import { dijkstra, calculerItineraireOptimal, calculerTempsTrajet } from '@/lib/dijkstra'
 import { NextRequest, NextResponse } from 'next/server'
-import { StatutCommande } from '@prisma/client'
+import { StatutCommande } from '@/generated/client'
 
 function generateRef(prefix: string) {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}`
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     })
     if (!commandes.length) return NextResponse.json({ error: 'Aucune commande validée' }, { status: 400 })
 
-    const pointsIds = [...new Set(commandes.map(c => c.pointId))]
+    const pointsIds = Array.from(new Set (commandes.map((c: any) => c.point.id)));
     if (pointsIds.length > vehicule.capacite) {
       return NextResponse.json(
         { error: `Capacité dépassée : ${pointsIds.length} points pour ${vehicule.capacite} max` },
@@ -62,14 +62,14 @@ export async function POST(req: NextRequest) {
     ])
 
     const graph = {
-      nodes: [{ id: 'ENTREPOT', label: 'Entrepôt', isEntrepot: true }, ...points.map(p => ({ id: p.id, label: p.nom }))],
-      edges: chemins.map(c => ({ id: c.id, source: c.departPointId ?? 'ENTREPOT', target: c.arriveePointId, distance: c.distance })),
+      nodes: [{ id: 'ENTREPOT', label: 'Entrepôt', isEntrepot: true }, ...points.map((p: any) => ({ id: p.id, label: p.nom }))],
+      edges: chemins.map((c: any) => ({ id: c.id, source: c.departPointId ?? 'ENTREPOT', target: c.arriveePointId, distance: c.distance })),
     }
 
-    const { itineraire, distanceTotale } = calculerItineraireOptimal(graph, 'ENTREPOT', pointsIds)
+    const { itineraire, distanceTotale } = calculerItineraireOptimal(graph, 'ENTREPOT', pointsIds as string[])
     const tempsPrevuMin = calculerTempsTrajet(distanceTotale, vehicule.vitesse, 1)
 
-    const livraison = await prisma.$transaction(async tx => {
+    const livraison = await prisma.$transaction(async (tx: any) => {
       const liv = await tx.livraison.create({
         data: {
           reference: generateRef('LIV'),
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
       const pointsVisites = itineraire.filter((id: string) => id !== 'ENTREPOT')
       for (let i = 0; i < pointsVisites.length; i++) {
         const pointId = pointsVisites[i]
-        const cmdsDuPoint = commandes.filter(c => c.pointId === pointId)
+        const cmdsDuPoint = commandes.filter((c: any) => c.pointId === pointId)
         for (const cmd of cmdsDuPoint) {
           await tx.arretLivraison.create({
             data: { livraisonId: liv.id, pointId, commandeId: cmd.id, ordre: i + 1 },
