@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireOperateur, requireAny } from '@/lib/api-guard'
 import { dijkstra, calculerItineraireOptimal, calculerTempsTrajet } from '@/lib/dijkstra'
 import { NextRequest, NextResponse } from 'next/server'
-import { StatutCommande } from '@/generated/client'
+import { StatutCommande } from '@prisma/client'
 
 function generateRef(prefix: string) {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}`
