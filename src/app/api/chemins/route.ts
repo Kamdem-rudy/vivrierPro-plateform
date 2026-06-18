@@ -1,0 +1,46 @@
+// src/app/api/chemins/route.ts
+import { prisma } from '@/lib/prisma'
+import { requireAdmin, requireAny } from '@/lib/api-guard'
+import { NextRequest, NextResponse } from 'next/server'
+
+export async function GET() {
+  const auth = await requireAny()
+  if (auth instanceof NextResponse) return auth
+
+  try {
+    const chemins = await prisma.chemin.findMany({
+      where: { actif: true },
+      include: { departPoint: true, arriveePoint: true },
+      orderBy: { distance: 'asc' },
+    })
+    return NextResponse.json(chemins)
+  } catch {
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const auth = await requireAdmin()
+  if (auth instanceof NextResponse) return auth
+
+  try {
+    const { departPointId, arriveePointId, distance } = await req.json()
+    if (!arriveePointId || !distance || parseFloat(distance) <= 0) {
+      return NextResponse.json({ error: 'Données invalides' }, { status: 400 })
+    }
+    if (departPointId && departPointId === arriveePointId) {
+      return NextResponse.json({ error: 'Départ et arrivée identiques' }, { status: 400 })
+    }
+    const chemin = await prisma.chemin.create({
+      data: {
+        departPointId: departPointId || null,
+        arriveePointId,
+        distance: parseFloat(distance),
+      },
+      include: { departPoint: true, arriveePoint: true },
+    })
+    return NextResponse.json(chemin, { status: 201 })
+  } catch {
+    return NextResponse.json({ error: 'Erreur création' }, { status: 500 })
+  }
+}

@@ -1,0 +1,192 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")   // Pooler PgBouncer port 6543
+  directUrl = env("DIRECT_URL")     // Connexion directe port 5432 (migrations)
+}
+
+model User {
+  id         String   @id @default(cuid())
+  nom        String
+  email      String   @unique
+  motDePasse String
+  role       Role     @default(OPERATEUR)
+  actif      Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  OPERATEUR
+  CHAUFFEUR
+}
+
+model Entrepot {
+  id        String   @id @default(cuid())
+  nom       String
+  adresse   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PointDistribution {
+  id        String   @id @default(cuid())
+  nom       String
+  adresse   String
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  commandes       Commande[]
+  cheminsDepart   Chemin[]         @relation("CheminDepart")
+  cheminsArrivee  Chemin[]         @relation("CheminArrivee")
+  arretLivraisons ArretLivraison[]
+}
+
+model Chemin {
+  id        String   @id @default(cuid())
+  distance  Float
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  departPointId  String?
+  arriveePointId String
+
+  departPoint  PointDistribution? @relation("CheminDepart",  fields: [departPointId],  references: [id])
+  arriveePoint PointDistribution  @relation("CheminArrivee", fields: [arriveePointId], references: [id])
+}
+
+model Produit {
+  id          String   @id @default(cuid())
+  nom         String   @unique
+  unite       String   @default("kg")
+  description String?
+  actif       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stock     Stock?
+  commandes Commande[]
+}
+
+model Stock {
+  id                 String   @id @default(cuid())
+  quantiteDisponible Float
+  quantiteReservee   Float    @default(0)
+  seuilAlerte        Float    @default(100)
+  version            Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  produitId  String          @unique
+  produit    Produit         @relation(fields: [produitId], references: [id])
+  mouvements MouvementStock[]
+}
+
+model MouvementStock {
+  id           String        @id @default(cuid())
+  type         TypeMouvement
+  quantite     Float
+  description  String?
+  versionApres Int
+  createdAt    DateTime      @default(now())
+
+  stockId    String
+  stock      Stock  @relation(fields: [stockId], references: [id])
+  commandeId String?
+}
+
+model Vehicule {
+  id              String       @id @default(cuid())
+  type            TypeVehicule
+  immatriculation String       @unique
+  capacite        Int
+  vitesse         Float
+  disponible      Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  livraisons Livraison[]
+}
+
+model Commande {
+  id          String         @id @default(cuid())
+  reference   String         @unique
+  quantite    Float
+  statut      StatutCommande @default(EN_ATTENTE)
+  heurePassee DateTime       @default(now())
+  notes       String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  pointId   String
+  point     PointDistribution @relation(fields: [pointId],   references: [id])
+  produitId String
+  produit   Produit           @relation(fields: [produitId], references: [id])
+  livraison ArretLivraison?
+}
+
+model Livraison {
+  id             String          @id @default(cuid())
+  reference      String          @unique
+  statut         StatutLivraison @default(PLANIFIEE)
+  distanceTotale Float
+  tempsPrevuMin  Int
+  dateDepart     DateTime
+  dateArrivee    DateTime?
+  itineraire     String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  vehiculeId String
+  vehicule   Vehicule         @relation(fields: [vehiculeId], references: [id])
+  arrets     ArretLivraison[]
+}
+
+model ArretLivraison {
+  id        String   @id @default(cuid())
+  ordre     Int
+  createdAt DateTime @default(now())
+
+  livraisonId String
+  livraison   Livraison         @relation(fields: [livraisonId], references: [id])
+  pointId     String
+  point       PointDistribution @relation(fields: [pointId],     references: [id])
+  commandeId  String            @unique
+  commande    Commande          @relation(fields: [commandeId],  references: [id])
+}
+
+enum TypeMouvement {
+  ENTREE
+  RESERVATION
+  LIBERATION
+  LIVRAISON
+  AJUSTEMENT
+}
+
+enum TypeVehicule {
+  MOTO
+  CAMIONNETTE
+  CAMION
+}
+
+enum StatutCommande {
+  EN_ATTENTE
+  VALIDEE
+  EN_COURS_LIVRAISON
+  LIVREE
+  ANNULEE
+}
+
+enum StatutLivraison {
+  PLANIFIEE
+  EN_COURS
+  TERMINEE
+  ANNULEE
+}
